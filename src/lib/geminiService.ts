@@ -3,6 +3,7 @@ import { GoogleGenAI, Type, type Chat } from "@google/genai";
 import type { RecipeAnalysis, GIData } from "./types";
 import Papa from 'papaparse';
 import Fuse from 'fuse.js';
+import { asset } from '$app/paths';
 
 function getAI() {
   if (typeof localStorage === 'undefined') return new GoogleGenAI({ apiKey: '' });
@@ -18,7 +19,7 @@ async function loadGIData() {
 
   try {
     console.log("Fetching GI Database...");
-    const response = await fetch('/gi_data.csv');
+    const response = await fetch(asset('/gi_data.csv'));
     const csvText = await response.text();
     console.log("GI Data CSV fetched (size: " + csvText.length + " bytes), parsing...");
 
@@ -44,7 +45,7 @@ async function loadGIData() {
       });
     });
   } catch (err) {
-    console.error("Failed to load GI data from /gi_data.csv:", err);
+    console.error(`Failed to load GI data from ${asset('/gi_data.csv')}:`, err);
   }
 }
 

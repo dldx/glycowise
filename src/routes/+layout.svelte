@@ -2,7 +2,8 @@
 	import './layout.css';
 	import favicon from '$lib/assets/favicon.svg';
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
+	import { asset } from '$app/paths';
+	import { Tooltip } from 'bits-ui';
 
 	let { children } = $props();
 
@@ -24,7 +25,10 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<link rel="manifest" href="{base}/manifest.webmanifest" />
-	<link rel="apple-touch-icon" href="{base}/favicon.svg" />
+	<link rel="manifest" href={asset('/manifest.webmanifest')} />
+	<link rel="apple-touch-icon" href={asset('/favicon.svg')} />
 </svelte:head>
-{@render children()}
+
+<Tooltip.Provider>
+	{@render children()}
+</Tooltip.Provider>
