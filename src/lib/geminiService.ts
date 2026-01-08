@@ -1,10 +1,14 @@
 
-import { GoogleGenAI, Type, Chat } from "@google/genai";
-import { RecipeAnalysis, GIData } from "./types";
+import { GoogleGenAI, Type, type Chat } from "@google/genai";
+import type { RecipeAnalysis, GIData } from "./types";
 import Papa from 'papaparse';
 import Fuse from 'fuse.js';
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+function getAI() {
+  if (typeof localStorage === 'undefined') return new GoogleGenAI({ apiKey: '' });
+  const apiKey = localStorage.getItem('gemini_api_key') || '';
+  return new GoogleGenAI({ apiKey });
+}
 
 let cachedGIData: GIData[] = [];
 let fuseInstance: Fuse<GIData> | null = null;
@@ -76,7 +80,8 @@ const analysisSchema = {
           name: { type: Type.STRING },
           gi: { type: Type.NUMBER },
           gl: { type: Type.NUMBER },
-          notes: { type: Type.STRING }
+          notes: { type: Type.STRING },
+          citation: { type: Type.STRING, description: "Exact 'Food Name' from the provided RELEVANT GI DATABASE entries if it directly matches an ingredient. Omit this field OR set to empty string if no direct database match is found." }
         },
         required: ["name", "gi", "gl", "notes"]
       }
@@ -116,8 +121,9 @@ export async function analyzeRecipe(
 
     Tasks:
     1. Estimate the GI and GL for each ingredient and the overall dish. Use the provided database entries if they match.
-    2. Explain how the preparation method (e.g., overcooking pasta, blending fruit) alters the GI.
-    3. Suggest lower-GI swaps for high-GI ingredients.
+    2. IMPORTANT: If you use a value from the "RELEVANT GI DATABASE ENTRIES" section, you MUST populate the "citation" field for that ingredient with the exact "Food Name" from the database.
+    3. Explain how the preparation method (e.g., overcooking pasta, blending fruit) alters the GI.
+    4. Suggest lower-GI swaps for high-GI ingredients.
     4. Provide a summary of the dish's impact on blood glucose.
 
     If an image is provided, identify the dish and its likely ingredients first.
@@ -127,12 +133,12 @@ export async function analyzeRecipe(
     ? { parts: [{ text: prompt }, { inlineData: { mimeType: 'image/jpeg', data: imageData.split(',')[1] } }] }
     : prompt;
 
-  const response = await ai.models.generateContent({
+  const response = await getAI().models.generateContent({
     model,
     contents,
     config: {
       responseMimeType: "application/json",
-      responseSchema: analysisSchema,
+      responseSchema: analysisSchema as any,
     },
   });
 
@@ -144,17 +150,15 @@ export async function analyzeRecipe(
 }
 
 export function startRecipeChat(analysis: RecipeAnalysis): Chat {
-  const localAi = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-  return localAi.chats.create({
+  return getAI().chats.create({
     model: 'gemini-3-flash-preview',
     config: {
-      systemInstruction: `You are "GlycoGuide Expert", a helpful clinical nutritionist.
-      You just performed an analysis for the dish: "${analysis.recipeName}".
-      Analysis Results: ${JSON.stringify(analysis)}
+      systemInstruction: `Act as a clinical nutritionist. You are discussing the following recipe analysis:
+        Analysis Results: ${JSON.stringify(analysis)}
 
-      The user will ask follow-up questions about this specific dish, its ingredients, and blood sugar management.
-      Be concise, evidence-based, and encouraging. If they ask about something unrelated to nutrition or the dish,
-      politely guide them back to their glycemic health goals.`,
+        The user will ask follow-up questions about this specific dish, its ingredients, and blood sugar management.
+        Be concise, evidence-based, and encouraging. If they ask about something unrelated to nutrition or the dish,
+        politely guide them back to their glycemic health goals.`,
     },
-  });
+  }) as unknown as Chat;
 }

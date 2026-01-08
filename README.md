@@ -1,20 +1,51 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# GlycoWise Recipe Analyzer
 
-# Run and deploy your AI Studio app
+An intelligent nutritional tool that calculates the Glycemic Index (GI) and Glycemic Load (GL) of recipes from text descriptions or photos, providing ingredient swaps and method-based optimizations.
 
-This contains everything you need to run your app locally.
+## Getting Started
 
-View your app in AI Studio: https://ai.studio/apps/drive/1sORnfSft6NZXUIGe19PevjQnImETbbdV
+1. Clone the repository.
+2. Install dependencies:
+   ```bash
+   bun install
+   ```
+3. Start the development server:
+   ```bash
+   bun run dev
+   ```
+4. Open your browser and enter your Gemini API Key in the settings.
 
-## Run Locally
+## Deployment
 
-**Prerequisites:**  Node.js
+The site is configured for static hosting (e.g., GitHub Pages) using `@sveltejs/adapter-static`.
 
+```sh
+# create a new project in the current directory
+npx sv create
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+# create a new project in my-app
+npx sv create my-app
+```
+
+## Developing
+
+Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+
+```sh
+npm run dev
+
+# or start the server and open the app in a new browser tab
+npm run dev -- --open
+```
+
+## Building
+
+To create a production version of your app:
+
+```sh
+npm run build
+```
+
+You can preview the production build with `npm run preview`.
+
+> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.

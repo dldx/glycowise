@@ -1,5 +1,5 @@
 {
-  "name": "GlycoGuide Recipe Analyzer",
+  "name": "GlycoWise Recipe Analyzer",
   "description": "An advanced nutritional tool that calculates the Glycemic Index (GI) and Glycemic Load (GL) of recipes from text descriptions or photos, providing ingredient swaps and method-based optimizations.",
   "requestFramePermissions": [
     "camera"

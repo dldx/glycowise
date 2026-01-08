@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+body { font-family: 'Inter', sans-serif; }
+.glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); }
+.markdown-content p { margin-bottom: 0.75rem; }
+.markdown-content ul { list-style-type: disc; margin-left: 1.25rem; margin-bottom: 0.75rem; }
+.markdown-content ol { list-style-type: decimal; margin-left: 1.25rem; margin-bottom: 0.75rem; }
+.markdown-content strong { font-weight: 600; }

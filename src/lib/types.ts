@@ -4,6 +4,7 @@ export interface IngredientAnalysis {
   gi: number;
   gl: number;
   notes: string;
+  citation?: string;
 }
 
 export interface SwapSuggestion {
