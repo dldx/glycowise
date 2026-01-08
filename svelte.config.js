@@ -14,6 +14,10 @@ const config = {
 		}),
 		paths: {
 			base: process.env.NODE_ENV === 'production' ? '/glycowise' : '',
+		},
+		prerender: {
+			handleHttpError: 'warn',
+			handleUnseenRoutes: 'ignore'
 		}
 	},
 	extensions: ['.svelte', '.svx']

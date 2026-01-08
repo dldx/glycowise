@@ -1,7 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig, loadEnv } from 'vite';
-import { SvelteKitPWA } from 'vite-plugin-pwa';
+import { SvelteKitPWA } from '@vite-pwa/sveltekit';
 
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, '.', '');
