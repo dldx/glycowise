@@ -3,6 +3,7 @@
   import { analyzeRecipe, startRecipeChat } from '$lib/geminiService';
   import { AnalysisStatus } from '$lib/types';
   import type { RecipeAnalysis, ChatMessage } from '$lib/types';
+  import { dbService } from '$lib/dbService.svelte';
   import type { Chat } from "@google/genai";
   import SvelteMarkdown from 'svelte-markdown';
   import Tooltip from '$lib/components/ui/tooltip.svelte';
@@ -12,6 +13,10 @@
   let status = $state(AnalysisStatus.IDLE);
   let analysis = $state<RecipeAnalysis | null>(null);
   let error = $state<string | null>(null);
+
+  onMount(() => {
+    dbService.loadDatabases();
+  });
 
   // Chat States
   let chatSession = $state<Chat | null>(null);
@@ -170,6 +175,31 @@
 
 <div class="bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-3 md:p-6 min-h-screen">
   <div class="mx-auto max-w-6xl">
+    {#if !dbService.isLoaded}
+      <div class="z-50 fixed inset-0 flex flex-col justify-center items-center bg-white/90 backdrop-blur-sm p-6 text-center">
+        <div class="inline-flex justify-center items-center bg-white shadow-sm mb-8 p-3 rounded-2xl">
+          <i class="mr-3 text-emerald-500 text-3xl fas fa-leaf"></i>
+          <h1 class="bg-clip-text bg-gradient-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-3xl">
+            GlycoWise
+          </h1>
+        </div>
+        
+        <div class="mb-4 w-full max-w-md">
+          <div class="flex justify-between mb-2">
+            <span class="font-bold text-slate-600 text-xs uppercase tracking-widest">{dbService.loadingStatus}</span>
+            <span class="font-bold text-emerald-600 text-xs">{dbService.progress}%</span>
+          </div>
+          <div class="bg-slate-100 rounded-full w-full h-3 overflow-hidden">
+            <div 
+              class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full transition-all duration-300" 
+              style="width: {dbService.progress}%"
+            ></div>
+          </div>
+        </div>
+        <p class="text-slate-400 text-xs">Initializing nutritional databases for precision analysis...</p>
+      </div>
+    {/if}
+
     <!-- Header -->
     <header class="relative mb-8 text-center">
       <div class="top-0 right-0 absolute">
@@ -283,11 +313,13 @@
 
           <button
             onclick={handleAnalyze}
-            disabled={status === AnalysisStatus.LOADING}
+            disabled={status === AnalysisStatus.LOADING || !dbService.isLoaded}
             class="bg-gradient-to-r from-emerald-500 to-emerald-600 disabled:opacity-50 shadow-emerald-200 shadow-lg hover:shadow-emerald-300 py-3.5 rounded-2xl w-full font-bold text-white text-sm disabled:transform-none transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed"
           >
             {#if status === AnalysisStatus.LOADING}
               <i class="mr-2 fas fa-spinner fa-spin"></i> Analyzing...
+            {:else if !dbService.isLoaded}
+              <i class="mr-2 fas fa-database"></i> Loading Databases...
             {:else}
               <i class="mr-2 fas fa-wand-magic-sparkles"></i> Generate Smart Analysis
             {/if}
@@ -311,84 +343,228 @@
               Analysis for: {analysis.recipeName}
             </h2>
 
-            <!-- Metrics Grid -->
-            <div class="gap-4 grid grid-cols-2 mb-6">
-              <div class="bg-white shadow-sm p-4 border border-slate-100 rounded-2xl">
-                <div class="mb-1 font-medium text-slate-500 text-xs">
-                  Glycemic Index
-                  <Tooltip class="ml-1 align-middle">
+            <!-- Scientific Pillars Grid -->
+            <div class="gap-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 mb-6">
+              <!-- Pillar 1: GL -->
+              <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
+                <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
+                  1. Glycemic Load
+                  <Tooltip>
                     {#snippet children()}
-                      <i class="text-[10px] text-slate-300 hover:text-emerald-500 transition-colors cursor-help fas fa-circle-info"></i>
+                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
-                      <p class="mb-1 pb-1 border-slate-700 border-b font-bold">Glycemic Index (GI)</p>
-                      <p class="font-normal leading-relaxed">A rating system for foods containing carbohydrates. It shows how quickly each food affects your blood sugar (glucose) level when that food is eaten on its own.</p>
+                      <p class="font-bold">Glycemic Load (GL)</p>
+                      <p class="font-normal text-xs">Measures the total glycemic impact per serving. Low &lt; 10, Medium 11-19, High 20+.</p>
                     {/snippet}
                   </Tooltip>
                 </div>
-                <div class="mb-1 font-bold text-slate-800 text-2xl">{analysis.totalGI}</div>
-                <span class="bg-emerald-100 px-2 py-0.5 rounded font-bold text-[10px] text-emerald-700 uppercase tracking-wider">
-                  {analysis.giCategory} GI
-                </span>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.glycemicLoad}</div>
+                <div class="mt-1">
+                  <span class="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider {analysis.glCategory === 'Low' ? 'bg-emerald-100 text-emerald-700' : analysis.glCategory === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}">
+                    {analysis.glCategory}
+                  </span>
+                </div>
               </div>
-              <div class="bg-white shadow-sm p-4 border border-slate-100 rounded-2xl">
-                <div class="mb-1 font-medium text-slate-500 text-xs">
-                  Glycemic Load
-                  <Tooltip class="ml-1 align-middle">
+
+              <!-- Pillar 2: Synergy -->
+              <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
+                <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
+                  2. Synergy
+                  <Tooltip>
                     {#snippet children()}
-                      <i class="text-[10px] text-slate-300 hover:text-emerald-500 transition-colors cursor-help fas fa-circle-info"></i>
+                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
-                      <p class="mb-1 pb-1 border-slate-700 border-b font-bold">Glycemic Load (GL)</p>
-                      <p class="font-normal leading-relaxed">Glycemic Load (GL) combines both the GI and the amount of carbohydrate in the food to give a more accurate picture of a food's real-world impact on blood sugar.</p>
+                      <p class="font-bold">Macronutrient Synergy</p>
+                      <p class="font-normal text-xs">Score (0-10) of how well protein, fat, and fiber "blunt" the glucose spike from carbs.</p>
                     {/snippet}
                   </Tooltip>
                 </div>
-                <div class="mb-1 font-bold text-slate-800 text-2xl">{analysis.totalGL}</div>
-                <span class="bg-sky-100 px-2 py-0.5 rounded font-bold text-[10px] text-sky-700 uppercase tracking-wider">
-                  {analysis.glCategory} GL
-                </span>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.macronutrientSynergy}/10</div>
+                <div class="mt-1">
+                  <div class="bg-slate-100 rounded-full w-full h-1">
+                    <div class="bg-emerald-500 rounded-full h-full" style="width: {analysis.healthMetrics.macronutrientSynergy * 10}%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Pillar 3: Lipids -->
+              <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
+                <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
+                  3. Lipid Ratio
+                  <Tooltip>
+                    {#snippet children()}
+                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Unsat:Sat Ratio</p>
+                      <p class="font-normal text-xs">Heart health metric. Goal is a high ratio of unsaturated to saturated fats.</p>
+                    {/snippet}
+                  </Tooltip>
+                </div>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.lipidProfileRatio.toFixed(1)}</div>
+                <div class="mt-1">
+                   <span class="font-bold text-[9px] text-slate-500 uppercase tracking-tight">Unsat : Sat</span>
+                </div>
+              </div>
+
+              <!-- Pillar 4: Soluble Fiber -->
+              <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
+                <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
+                  4. Soluble Fiber
+                  <Tooltip>
+                    {#snippet children()}
+                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Soluble Fiber</p>
+                      <p class="font-normal text-xs">Form gels in the gut to slow sugar absorption and feed beneficial microbiome.</p>
+                    {/snippet}
+                  </Tooltip>
+                </div>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.solubleFiberContent}g</div>
+                <div class="mt-1">
+                  <span class="font-bold text-[9px] text-emerald-600 uppercase tracking-tight">Gut Health Factor</span>
+                </div>
+              </div>
+
+              <!-- Pillar 5: Na:K Ratio -->
+              <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
+                <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
+                  5. Na : K Balance
+                  <Tooltip>
+                    {#snippet children()}
+                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Sodium to Potassium Ratio</p>
+                      <p class="font-normal text-xs">Goal is &lt; 1.0. High potassium relative to sodium protects blood pressure.</p>
+                    {/snippet}
+                  </Tooltip>
+                </div>
+                <div class="font-bold {analysis.healthMetrics.sodiumPotassiumRatio < 1 ? 'text-emerald-600' : 'text-rose-600'} text-xl">
+                  {analysis.healthMetrics.sodiumPotassiumRatio.toFixed(2)}
+                </div>
+                <div class="mt-1">
+                  <span class="font-bold text-[9px] uppercase tracking-tight">
+                    {analysis.healthMetrics.sodiumPotassiumRatio < 1 ? 'Balanced' : 'High Sodium'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-indigo-50/50 mb-6 p-4 border border-indigo-100 rounded-2xl">
+              <div class="flex items-center mb-2">
+                <div class="flex justify-center items-center bg-indigo-100 mr-2 rounded-lg w-6 h-6">
+                  <i class="text-indigo-600 text-xs fas fa-microscope"></i>
+                </div>
+                <h3 class="font-bold text-indigo-900 text-sm">Clinical Pillar Assessment</h3>
+                {#if analysis.healthMetrics.ageRisk}
+                  <span class="ml-auto px-2 py-0.5 rounded-full font-bold text-[9px] uppercase {analysis.healthMetrics.ageRisk === 'low' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                    AGE Risk: {analysis.healthMetrics.ageRisk}
+                  </span>
+                {/if}
+              </div>
+              <p class="mb-4 text-indigo-800 text-xs leading-relaxed">
+                {analysis.healthMetrics.pillarExplanation}
+              </p>
+
+              <!-- Advanced Metrics Row -->
+              <div class="gap-3 grid grid-cols-1 sm:grid-cols-3 pt-3 border-indigo-100/50 border-t">
+                <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
+                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Fiber : Carb</div>
+                  <div class="font-bold text-indigo-900 text-xs">{analysis.healthMetrics.fiberToCarbRatio}</div>
+                  <div class="text-[8px] text-slate-400">Target 1:5 or better</div>
+                </div>
+                <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
+                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Sat. Fat %</div>
+                  <div class="text-xs font-bold {analysis.healthMetrics.saturatedFatCaloriesPercent < 6 ? 'text-emerald-600' : 'text-amber-600'}">
+                    {analysis.healthMetrics.saturatedFatCaloriesPercent.toFixed(1)}%
+                  </div>
+                  <div class="text-[8px] text-slate-400">AHA Target &lt; 6%</div>
+                </div>
+                <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
+                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Heart Health</div>
+                  <div class="font-bold text-indigo-900 text-xs">{analysis.healthMetrics.heartHealthScore}/100</div>
+                  <div class="bg-indigo-100 mt-1 rounded-full w-full h-1 overflow-hidden">
+                    <div class="bg-indigo-500 h-full" style="width: {analysis.healthMetrics.heartHealthScore}%"></div>
+                  </div>
+                </div>
               </div>
             </div>
 
             <!-- Ingredients Table -->
             <div class="mb-6">
-              <h3 class="mb-3 px-2 font-bold text-slate-800 text-base">Detailed Breakdown</h3>
-              <div class="border border-slate-100 rounded-2xl overflow-hidden">
+              <h3 class="mb-3 px-2 font-bold text-slate-800 text-base">Ingredient Clinical Data</h3>
+              <div class="border border-slate-100 rounded-2xl overflow-hidden overflow-x-auto">
                 <table class="w-full text-left">
                   <thead class="bg-slate-50 border-slate-100 border-b">
                     <tr>
-                      <th class="px-4 py-2 font-bold text-[10px] text-slate-500 uppercase">Ingredient</th>
-                      <th class="px-4 py-2 font-bold text-[10px] text-slate-500 text-center uppercase">GI</th>
-                      <th class="px-4 py-2 font-bold text-[10px] text-slate-500 text-center uppercase">GL</th>
+                      <th class="px-4 py-3 font-bold text-[10px] text-slate-500 uppercase">Ingredient</th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">P / F / FB</th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">GI</th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">GL</th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-slate-100">
                     {#each analysis.ingredients as ing}
                       <tr class="hover:bg-slate-50 transition-colors">
-                        <td class="px-4 py-2.5 font-medium text-slate-700 text-sm">
-                          {ing.name}
-                          <div class="mt-0.5 font-normal text-[10px] text-slate-400">{ing.notes}</div>
-                          {#if ing.citation && ing.citation !== 'null' && ing.citation !== ''}
-                            <div class="flex items-center bg-emerald-50 mt-1 px-1.5 py-0.5 rounded w-fit font-semibold text-[9px] text-emerald-600">
-                              <i class="mr-1 fas fa-book-open"></i> Source: {ing.citation}
-                            </div>
-                          {/if}
+                        <td class="px-4 py-3">
+                          <div class="font-bold text-slate-700 text-sm">{ing.name}</div>
+                          <div class="flex flex-wrap gap-1 mt-1">
+                            {#if ing.groundingSource && ing.groundingSource !== 'ESTIMATED'}
+                               <span class="bg-emerald-50 px-1 py-0.5 rounded font-bold text-[8px] text-emerald-600 uppercase tracking-tighter">
+                                 {ing.groundingSource} Match
+                               </span>
+                            {/if}
+                            {#if ing.smokePointWarning}
+                              <Tooltip>
+                                {#snippet children()}
+                                  <span class="bg-amber-100 px-1 py-0.5 rounded font-bold text-[8px] text-amber-600 uppercase tracking-tighter cursor-help">
+                                    <i class="mr-0.5 fas fa-temperature-high"></i> Smoke Point
+                                  </span>
+                                {/snippet}
+                                {#snippet content()}
+                                  <p class="font-bold text-amber-600">Toxic Compound Alert</p>
+                                  <p class="font-normal text-xs">{ing.smokePointWarning}</p>
+                                {/snippet}
+                              </Tooltip>
+                            {/if}
+                            {#if ing.hiddenSugarDetection}
+                              <Tooltip>
+                                {#snippet children()}
+                                  <span class="bg-rose-100 px-1 py-0.5 rounded font-bold text-[8px] text-rose-600 uppercase tracking-tighter cursor-help">
+                                    <i class="mr-0.5 fas fa-cookie"></i> Hidden Sugar
+                                  </span>
+                                {/snippet}
+                                {#snippet content()}
+                                  <p class="font-bold text-rose-600">Metabolic Disruptor</p>
+                                  <p class="font-normal text-xs">{ing.hiddenSugarDetection}</p>
+                                {/snippet}
+                              </Tooltip>
+                            {/if}
+                          </div>
                         </td>
-                        <td class="px-4 py-2.5 text-sm text-center font-bold {ing.gi > 70 ? 'text-rose-500' : ing.gi > 55 ? 'text-amber-500' : 'text-emerald-500'}">
+                        <td class="px-2 py-3">
+                          <div class="flex justify-center gap-1.5 opacity-80 grayscale-[0.5]">
+                            <span class="bg-blue-50 px-1 border border-blue-100 rounded text-[10px] text-blue-700" title="Protein">{ing.protein}g</span>
+                            <span class="bg-amber-50 px-1 border border-amber-100 rounded text-[10px] text-amber-700" title="Fat">{ing.fat}g</span>
+                            <span class="bg-emerald-50 px-1 border border-emerald-100 rounded text-[10px] text-emerald-700" title="Fiber">{ing.fiber}g</span>
+                          </div>
+                        </td>
+                        <td class="px-2 py-3 text-sm text-center font-bold {ing.gi > 70 ? 'text-rose-500' : ing.gi > 55 ? 'text-amber-500' : 'text-emerald-500'}">
                           {ing.gi}
                         </td>
-                        <td class="px-4 py-2.5 font-bold text-slate-600 text-sm text-center">{ing.gl}</td>
+                        <td class="px-2 py-3 font-bold text-slate-600 text-sm text-center">{ing.gl}</td>
                       </tr>
                     {/each}
                   </tbody>
                 </table>
               </div>
-              {#if analysis.ingredients.some(i => i.citation && i.citation !== 'null' && i.citation !== '')}
-                <p class="mt-2 px-2 text-[9px] text-slate-400 italic">
-                  * Sources cited from the <a href="https://glycemicindex.com/gi-search/" target="_blank" class="font-medium text-emerald-600 hover:underline">Glycemic Index Database</a>.
-                </p>
-              {/if}
+              <p class="mt-2 px-2 text-[9px] text-slate-400 italic">
+                * Cross-referenced against 2025 USDA Foundation Food Data and International GI Databases.
+              </p>
             </div>
 
             <!-- Method Impact -->

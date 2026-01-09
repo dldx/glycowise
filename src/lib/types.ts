@@ -1,16 +1,42 @@
 
+export type GroundingSource = 'USDA' | 'GI_DB' | 'ESTIMATED';
+
 export interface IngredientAnalysis {
   name: string;
+  netCarbs: number;
+  protein: number;
+  fat: number;
+  saturatedFat?: number;
+  fiber: number;
+  solubleFiber?: number;
+  potassium?: number;
+  sodium?: number;
   gi: number;
   gl: number;
   notes: string;
+  groundingSource: GroundingSource;
   citation?: string;
+  matchConfidence: number;
 }
 
 export interface SwapSuggestion {
   original: string;
   replacement: string;
   benefit: string;
+}
+
+export interface HealthMetrics {
+  glycemicLoad: number;
+  macronutrientSynergy: number; // 0-10
+  lipidProfileRatio: number; // Unsat:Sat
+  sodiumPotassiumRatio: number; // Na:K
+  solubleFiberContent: number; // grams
+  ageRisk: 'low' | 'moderate' | 'high';
+  pillarExplanation: string;
+  // Specific requested data points
+  fiberToCarbRatio: string; // e.g. "1:5"
+  saturatedFatCaloriesPercent: number; // AHA recommends < 6%
+  heartHealthScore: number; // 0-100 composite
 }
 
 export interface RecipeAnalysis {
@@ -23,6 +49,7 @@ export interface RecipeAnalysis {
   methodImpact: string;
   swaps: SwapSuggestion[];
   summary: string;
+  healthMetrics: HealthMetrics;
 }
 
 export interface ChatMessage {

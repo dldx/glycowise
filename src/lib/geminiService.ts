@@ -1,68 +1,12 @@
 
 import { GoogleGenAI, Type, type Chat } from "@google/genai";
-import type { RecipeAnalysis, GIData } from "./types";
-import Papa from 'papaparse';
-import Fuse from 'fuse.js';
-import { asset } from '$app/paths';
+import type { RecipeAnalysis } from "./types";
+import { dbService } from "./dbService.svelte";
 
 function getAI() {
   if (typeof localStorage === 'undefined') return new GoogleGenAI({ apiKey: '' });
   const apiKey = localStorage.getItem('gemini_api_key') || '';
   return new GoogleGenAI({ apiKey });
-}
-
-let cachedGIData: GIData[] = [];
-let fuseInstance: Fuse<GIData> | null = null;
-
-async function loadGIData() {
-  if (cachedGIData.length > 0) return;
-
-  try {
-    console.log("Fetching GI Database...");
-    const response = await fetch(asset('/gi_data.csv'));
-    const csvText = await response.text();
-    console.log("GI Data CSV fetched (size: " + csvText.length + " bytes), parsing...");
-
-    return new Promise<void>((resolve, reject) => {
-      Papa.parse(csvText, {
-        header: true,
-        dynamicTyping: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          cachedGIData = results.data as GIData[];
-          console.log(`Successfully indexed ${cachedGIData.length} entries for fuzzy search.`);
-          fuseInstance = new Fuse(cachedGIData, {
-            keys: ['Food Name', 'Product Category'],
-            threshold: 0.4,
-            distance: 100,
-          });
-          resolve();
-        },
-        error: (error: any) => {
-          console.error("CSV Parsing Error:", error);
-          reject(error);
-        }
-      });
-    });
-  } catch (err) {
-    console.error(`Failed to load GI data from ${asset('/gi_data.csv')}:`, err);
-  }
-}
-
-async function getRelevantContext(input: string): Promise<string> {
-  await loadGIData();
-  if (!fuseInstance) return "";
-
-  const results = fuseInstance.search(input, { limit: 15 });
-  if (results.length === 0) return "";
-
-  const contextData = results.map(r => {
-    const item = r.item;
-    return `- ${item['Food Name']}: GI=${item.GI}, GL=${item.GL} (${item['Product Category']})`;
-  }).join('\n');
-  console.log("Relevant GI Data Found:\n", contextData);
-
-  return `\nRELEVANT GI DATABASE ENTRIES (Use these as reference for accurate analysis):\n${contextData}\n`;
 }
 
 const analysisSchema = {
@@ -73,21 +17,49 @@ const analysisSchema = {
     giCategory: { type: Type.STRING, description: "GI Category (Low < 55, Medium 56-69, High 70+)" },
     totalGL: { type: Type.NUMBER, description: "Estimated Glycemic Load for a standard serving" },
     glCategory: { type: Type.STRING, description: "GL Category (Low < 10, Medium 11-19, High 20+)" },
+    healthMetrics: {
+      type: Type.OBJECT,
+      properties: {
+        glycemicLoad: { type: Type.NUMBER },
+        macronutrientSynergy: { type: Type.NUMBER, description: "Score 0-10 of how well fiber/protein/fat blunt glucose spikes" },
+        lipidProfileRatio: { type: Type.NUMBER, description: "Unsaturated to Saturated fat ratio" },
+        sodiumPotassiumRatio: { type: Type.NUMBER, description: "Goal is < 1.0 (More K than Na)" },
+        solubleFiberContent: { type: Type.NUMBER, description: "Total grams of soluble fiber" },
+        ageRisk: { type: Type.STRING, enum: ["low", "moderate", "high"], description: "Risk of Advanced Glycation End-products based on cooking method" },
+        pillarExplanation: { type: Type.STRING, description: "Concise summary of how the recipe performs against these 5 metrics" },
+        fiberToCarbRatio: { type: Type.STRING, description: "Ratio of Fiber to Total Carbs (e.g. 1:5)" },
+        saturatedFatCaloriesPercent: { type: Type.NUMBER, description: "Percentage of total calories derived from saturated fat" },
+        heartHealthScore: { type: Type.NUMBER, description: "Composite score 0-100 based on fiber, omega-3s, and low sodium" }
+      },
+      required: ["glycemicLoad", "macronutrientSynergy", "lipidProfileRatio", "sodiumPotassiumRatio", "solubleFiberContent", "ageRisk", "pillarExplanation", "fiberToCarbRatio", "saturatedFatCaloriesPercent", "heartHealthScore"]
+    },
     ingredients: {
       type: Type.ARRAY,
       items: {
         type: Type.OBJECT,
         properties: {
           name: { type: Type.STRING },
+          netCarbs: { type: Type.NUMBER },
+          protein: { type: Type.NUMBER },
+          fat: { type: Type.NUMBER },
+          saturatedFat: { type: Type.NUMBER },
+          fiber: { type: Type.NUMBER },
+          solubleFiber: { type: Type.NUMBER },
+          potassium: { type: Type.NUMBER },
+          sodium: { type: Type.NUMBER },
           gi: { type: Type.NUMBER },
           gl: { type: Type.NUMBER },
+          smokePointWarning: { type: Type.STRING, description: "Warning if cooking temperature exceeds fat's stability" },
+          hiddenSugarDetection: { type: Type.STRING, description: "Identified non-obvious sweeteners found in this ingredient" },
           notes: { type: Type.STRING },
-          citation: { type: Type.STRING, description: "Exact 'Food Name' from the provided RELEVANT GI DATABASE entries if it directly matches an ingredient. Omit this field OR set to empty string if no direct database match is found." }
+          groundingSource: { type: Type.STRING, enum: ["USDA", "GI_DB", "ESTIMATED"] },
+          citation: { type: Type.STRING, description: "Reference value from databases if available" },
+          matchConfidence: { type: Type.NUMBER }
         },
-        required: ["name", "gi", "gl", "notes"]
+        required: ["name", "netCarbs", "protein", "fat", "fiber", "gi", "gl", "groundingSource"]
       }
     },
-    methodImpact: { type: Type.STRING, description: "How the cooking method (boiling, frying, etc.) affects the GI/GL" },
+    methodImpact: { type: Type.STRING, description: "How cooking affects GI and AGE risk" },
     swaps: {
       type: Type.ARRAY,
       items: {
@@ -100,9 +72,9 @@ const analysisSchema = {
         required: ["original", "replacement", "benefit"]
       }
     },
-    summary: { type: Type.STRING, description: "Overall nutritional advice regarding blood sugar management" }
+    summary: { type: Type.STRING, description: "Overall metabolic health impact assessment" }
   },
-  required: ["recipeName", "totalGI", "giCategory", "totalGL", "glCategory", "ingredients", "methodImpact", "swaps", "summary"]
+  required: ["recipeName", "totalGI", "giCategory", "totalGL", "glCategory", "healthMetrics", "ingredients", "methodImpact", "swaps", "summary"]
 };
 
 export async function analyzeRecipe(
@@ -111,23 +83,32 @@ export async function analyzeRecipe(
 ): Promise<RecipeAnalysis> {
   const model = "gemini-3-flash-preview";
 
-  const relevantGI = await getRelevantContext(input);
+  const groundingData = dbService.getRelevantContext(input);
 
   const prompt = `
-    Act as a clinical nutritionist and dietitian expert in glycemic indexing.
-    Analyze the following recipe or food image for its Glycemic Index (GI) and Glycemic Load (GL).
+    Act as a world-class endocrinologist and clinical nutritionist.
+    Analyze the following recipe or food image using these Five Scientific Pillars:
+    1. Glycemic Load (Precision GL based on database values)
+    2. Macronutrient Synergy (How protein, fat, and fiber blunt glucose absorption)
+    3. Lipid Profile Ratios (Unsaturated vs. Saturated fats for cardiovascular health)
+    4. Soluble Fiber (Critical for gut microbiome and post-prandial stability)
+    5. Sodium-to-Potassium Balance (Goal Na:K < 1.0 for blood pressure)
 
-    User Input: ${input}
-    ${relevantGI}
+    USER INPUT: ${input}
 
-    Tasks:
-    1. Estimate the GI and GL for each ingredient and the overall dish. Use the provided database entries if they match.
-    2. IMPORTANT: If you use a value from the "RELEVANT GI DATABASE ENTRIES" section, you MUST populate the "citation" field for that ingredient with the exact "Food Name" from the database.
-    3. Explain how the preparation method (e.g., overcooking pasta, blending fruit) alters the GI.
-    4. Suggest lower-GI swaps for high-GI ingredients.
-    4. Provide a summary of the dish's impact on blood glucose.
+    GROUNDING DATA (Use these for accuracy):
+    ${groundingData}
 
-    If an image is provided, identify the dish and its likely ingredients first.
+    SPECIFIC INSTRUCTIONS:
+    - For EVERY ingredient, look for a match in the GROUNDING DATA.
+    - If a match is found in the USDA data, extract protein, fat, fiber, potassium, and sodium.
+    - If a match is found in the GI Database, extract GI/GL.
+    - HIDDEN SUGAR: Look for 50+ alternative names for sugar in processed ingredients (e.g. maltodextrin, syrups, agave) and flag them in the summary/notes.
+    - SMOKE POINTS: If the cooking method involves heating fats, warn if the fat used (e.g. flax, EVOO) is likely to exceed its smoke point.
+    - Calculate 'macronutrientSynergy' from 0-10 based on the presence of blunting factors (Fiber/Protein/Fat).
+    - Assess 'ageRisk' (Advanced Glycation End-products) based on cooking methods like frying/grilling vs steaming.
+    - Provide deep clinical insights in the 'pillarExplanation'.
+    - Calculate the specific 'fiberToCarbRatio' and 'saturatedFatCaloriesPercent' accurately.
   `;
 
   const contents: any = imageData
