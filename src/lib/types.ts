@@ -7,8 +7,8 @@ export interface IngredientAnalysis {
   protein: number;
   fat: number;
   saturatedFat?: number;
-  fiber: number;
-  solubleFiber?: number;
+  fibre: number;
+  solubleFibre?: number;
   potassium?: number;
   sodium?: number;
   gi: number;
@@ -17,6 +17,8 @@ export interface IngredientAnalysis {
   groundingSource: GroundingSource;
   citation?: string;
   matchConfidence: number;
+  smokePointWarning?: string;
+  hiddenSugarDetection?: string;
 }
 
 export interface SwapSuggestion {
@@ -26,16 +28,16 @@ export interface SwapSuggestion {
 }
 
 export interface HealthMetrics {
-  glycemicLoad: number;
+  glycaemicLoad: number;
   macronutrientSynergy: number; // 0-10
   lipidProfileRatio: number; // Unsat:Sat
   sodiumPotassiumRatio: number; // Na:K
-  solubleFiberContent: number; // grams
+  solubleFibreContent: number; // grams
   ageRisk: 'low' | 'moderate' | 'high';
   pillarExplanation: string;
   // Specific requested data points
-  fiberToCarbRatio: string; // e.g. "1:5"
-  saturatedFatCaloriesPercent: number; // AHA recommends < 6%
+  fibreToCarbRatio: string; // e.g. "1:5"
+  saturatedFatCaloriesPercent: number; // NHS/BHF recommends < 11% (or similar, keeping generic but removing AHA)
   heartHealthScore: number; // 0-100 composite
 }
 

@@ -1,18 +1,31 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { analyzeRecipe, startRecipeChat } from '$lib/geminiService';
+  import { analyseRecipe, startRecipeChat } from '$lib/geminiService';
   import { AnalysisStatus } from '$lib/types';
   import type { RecipeAnalysis, ChatMessage } from '$lib/types';
   import { dbService } from '$lib/dbService.svelte';
   import type { Chat } from "@google/genai";
   import SvelteMarkdown from 'svelte-markdown';
   import Tooltip from '$lib/components/ui/tooltip.svelte';
+  import GlycaemicChart from '$lib/components/charts/GlycaemicChart.svelte';
+  import MacroChart from '$lib/components/charts/MacroChart.svelte';
 
   let recipeText = $state('');
   let image = $state<string | null>(null);
   let status = $state(AnalysisStatus.IDLE);
   let analysis = $state<RecipeAnalysis | null>(null);
   let error = $state<string | null>(null);
+
+  const macroTotals = $derived.by(() => {
+    if (!analysis) return { protein: 0, fat: 0, fibre: 0, carbs: 0 };
+    return analysis.ingredients.reduce((acc, ing) => {
+      acc.protein += ing.protein || 0;
+      acc.fat += ing.fat || 0;
+      acc.fibre += ing.fibre || 0;
+      acc.carbs += ing.netCarbs || 0;
+      return acc;
+    }, { protein: 0, fat: 0, fibre: 0, carbs: 0 });
+  });
 
   onMount(() => {
     dbService.loadDatabases();
@@ -24,6 +37,7 @@
   let chatInput = $state('');
   let isChatting = $state(false);
   let chatEndRef: HTMLDivElement | undefined = $state();
+  let resultsRef: HTMLDivElement | undefined = $state();
 
   let showApiKeyPrompt = $state(false);
   let tempApiKey = $state('');
@@ -113,7 +127,7 @@
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyse = async () => {
     if (!recipeText && !image) {
       error = "Please provide a recipe description or a photo.";
       return;
@@ -125,14 +139,14 @@
     analysis = null;
 
     try {
-      const result = await analyzeRecipe(recipeText || "Analyze this dish", image || undefined);
+      const result = await analyseRecipe(recipeText || "Analyse this dish", image || undefined);
       analysis = result;
       const session = startRecipeChat(result);
       chatSession = session;
       status = AnalysisStatus.SUCCESS;
     } catch (err) {
       console.error(err);
-      error = "Failed to analyze the recipe. Please try again.";
+      error = "Failed to analyse the recipe. Please try again.";
       status = AnalysisStatus.ERROR;
     }
   };
@@ -167,31 +181,37 @@
   };
 
   $effect(() => {
-    if (chatHistory || isChatting) {
+    if (chatHistory.length > 0 || isChatting) {
       chatEndRef?.scrollIntoView({ behavior: "smooth" });
+    }
+  });
+
+  $effect(() => {
+    if (status === AnalysisStatus.SUCCESS && resultsRef) {
+      resultsRef.scrollIntoView({ behavior: "smooth", block: 'start' });
     }
   });
 </script>
 
-<div class="bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-3 md:p-6 min-h-screen">
+<div class="bg-linear-to-br from-emerald-50 via-white to-sky-50 p-3 md:p-6 min-h-screen">
   <div class="mx-auto max-w-6xl">
     {#if !dbService.isLoaded}
       <div class="z-50 fixed inset-0 flex flex-col justify-center items-center bg-white/90 backdrop-blur-sm p-6 text-center">
         <div class="inline-flex justify-center items-center bg-white shadow-sm mb-8 p-3 rounded-2xl">
           <i class="mr-3 text-emerald-500 text-3xl fas fa-leaf"></i>
-          <h1 class="bg-clip-text bg-gradient-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-3xl">
+          <h1 class="bg-clip-text bg-linear-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-3xl">
             GlycoWise
           </h1>
         </div>
-        
+
         <div class="mb-4 w-full max-w-md">
           <div class="flex justify-between mb-2">
             <span class="font-bold text-slate-600 text-xs uppercase tracking-widest">{dbService.loadingStatus}</span>
             <span class="font-bold text-emerald-600 text-xs">{dbService.progress}%</span>
           </div>
           <div class="bg-slate-100 rounded-full w-full h-3 overflow-hidden">
-            <div 
-              class="bg-gradient-to-r from-emerald-500 to-sky-500 h-full transition-all duration-300" 
+            <div
+              class="bg-linear-to-r from-emerald-500 to-sky-500 h-full transition-all duration-300"
               style="width: {dbService.progress}%"
             ></div>
           </div>
@@ -213,15 +233,15 @@
       </div>
       <div class="inline-flex justify-center items-center bg-white shadow-sm mb-3 p-2.5 rounded-2xl">
         <i class="mr-3 text-emerald-500 text-2xl fas fa-leaf"></i>
-        <h1 class="bg-clip-text bg-gradient-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-2xl">
+        <h1 class="bg-clip-text bg-linear-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-2xl">
           GlycoWise
         </h1>
       </div>
-      <p class="text-slate-600 text-base">Intelligent Glycemic Index & Load Analysis</p>
+      <p class="text-slate-600 text-base">Intelligent Glycaemic Index & Load Analysis</p>
       <p class="mt-1 font-medium text-emerald-600 text-xs uppercase tracking-widest">Powered by Gemini 3 Flash (Preview)</p>
       <div class="mx-auto mt-6 max-w-2xl">
         <p class="bg-emerald-50/50 shadow-sm p-4 border border-emerald-100/50 rounded-2xl text-slate-600 text-sm leading-relaxed">
-          GlycoWise provides data-driven insights into the glycemic impact of your meals. By cross-referencing ingredients with clinical database records, we estimate Glycemic Index and Load to help you manage blood glucose levels effectively.
+          GlycoWise provides data-driven insights into the glycaemic impact of your meals. By cross-referencing ingredients with clinical database records, we estimate Glycaemic Index and Load to help you manage blood glucose levels effectively.
         </p>
       </div>
     </header>
@@ -244,20 +264,21 @@
             <textarea
               id="recipe"
               class="bg-white/50 p-4 border border-slate-200 focus:border-transparent rounded-2xl outline-none focus:ring-2 focus:ring-emerald-500 w-full h-36 placeholder:text-slate-400 transition-all resize-none"
-              placeholder="Example: One cup of cooked white rice with two grilled chicken breasts and steamed broccoli..."
+              placeholder="Example: 100g of cooked white rice with two grilled chicken breasts and steamed broccoli..."
               bind:value={recipeText}
             ></textarea>
           </div>
 
           <div class="group relative">
-            <label class="block mb-2 font-semibold text-slate-700 text-sm">
+            <label for="foodPhoto" class="block mb-2 font-semibold text-slate-700 text-sm">
               Food Photo (Optional)
             </label>
-            <div class="relative flex flex-col justify-center items-center bg-white/30 border-2 border-slate-300 border-dashed rounded-2xl w-full h-44 overflow-hidden transition-all">
+            <div id="foodPhoto" class="relative flex flex-col justify-center items-center bg-white/30 border-2 border-slate-300 border-dashed rounded-2xl w-full h-44 overflow-hidden transition-all">
               {#if image}
                 <img src={image} alt="Preview" class="w-full h-full object-cover" />
                 <button
                   onclick={() => { image = null; stopCamera(); }}
+                  aria-label="Remove photo"
                   class="top-2 right-2 z-10 absolute flex justify-center items-center bg-rose-500 hover:bg-rose-600 shadow-lg rounded-full w-7 h-7 text-white transition-colors"
                 >
                   <i class="text-xs fas fa-times"></i>
@@ -312,12 +333,12 @@
           </div>
 
           <button
-            onclick={handleAnalyze}
+            onclick={handleAnalyse}
             disabled={status === AnalysisStatus.LOADING || !dbService.isLoaded}
-            class="bg-gradient-to-r from-emerald-500 to-emerald-600 disabled:opacity-50 shadow-emerald-200 shadow-lg hover:shadow-emerald-300 py-3.5 rounded-2xl w-full font-bold text-white text-sm disabled:transform-none transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed"
+            class="bg-linear-to-r from-emerald-500 to-emerald-600 disabled:opacity-50 shadow-emerald-200 shadow-lg hover:shadow-emerald-300 py-3.5 rounded-2xl w-full font-bold text-white text-sm disabled:transform-none transition-all hover:-translate-y-0.5 active:translate-y-0 disabled:cursor-not-allowed"
           >
             {#if status === AnalysisStatus.LOADING}
-              <i class="mr-2 fas fa-spinner fa-spin"></i> Analyzing...
+              <i class="mr-2 fas fa-spinner fa-spin"></i> Analysing...
             {:else if !dbService.isLoaded}
               <i class="mr-2 fas fa-database"></i> Loading Databases...
             {:else}
@@ -337,7 +358,7 @@
       <!-- Results Section -->
       <section class="space-y-6">
         {#if status === AnalysisStatus.SUCCESS && analysis}
-          <div class="slide-in-from-bottom-4 shadow-xl p-5 border border-white/50 rounded-3xl animate-in duration-500 glass fade-in">
+          <div bind:this={resultsRef} class="slide-in-from-bottom-4 shadow-xl p-5 border border-white/50 rounded-3xl animate-in duration-500 glass fade-in">
             <h2 class="flex items-center mb-5 font-bold text-slate-800 text-xl">
               <span class="bg-emerald-500 mr-4 rounded-full w-2 h-7"></span>
               Analysis for: {analysis.recipeName}
@@ -348,18 +369,18 @@
               <!-- Pillar 1: GL -->
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
-                  1. Glycemic Load
-                  <Tooltip>
+                  1. Glycaemic Load
+                  <Tooltip class="-m-1.5 p-1.5">
                     {#snippet children()}
-                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                      <i class="text-slate-400 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
-                      <p class="font-bold">Glycemic Load (GL)</p>
-                      <p class="font-normal text-xs">Measures the total glycemic impact per serving. Low &lt; 10, Medium 11-19, High 20+.</p>
+                      <p class="font-bold">Glycaemic Load (GL)</p>
+                      <p class="font-normal text-xs">Measures the total glycaemic impact per serving. Low &lt; 10, Medium 11-19, High 20+.</p>
                     {/snippet}
                   </Tooltip>
                 </div>
-                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.glycemicLoad}</div>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.glycaemicLoad}</div>
                 <div class="mt-1">
                   <span class="px-1.5 py-0.5 rounded font-bold text-[9px] uppercase tracking-wider {analysis.glCategory === 'Low' ? 'bg-emerald-100 text-emerald-700' : analysis.glCategory === 'Medium' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}">
                     {analysis.glCategory}
@@ -371,13 +392,13 @@
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
                   2. Synergy
-                  <Tooltip>
+                  <Tooltip class="-m-1.5 p-1.5">
                     {#snippet children()}
-                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                      <i class="text-slate-400 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
                       <p class="font-bold">Macronutrient Synergy</p>
-                      <p class="font-normal text-xs">Score (0-10) of how well protein, fat, and fiber "blunt" the glucose spike from carbs.</p>
+                      <p class="font-normal text-xs">Score (0-10) of how well protein, fat, and fibre "blunt" the glucose spike from carbs.</p>
                     {/snippet}
                   </Tooltip>
                 </div>
@@ -393,9 +414,9 @@
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
                   3. Lipid Ratio
-                  <Tooltip>
+                  <Tooltip class="-m-1.5 p-1.5">
                     {#snippet children()}
-                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                      <i class="text-slate-400 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
                       <p class="font-bold">Unsat:Sat Ratio</p>
@@ -409,21 +430,21 @@
                 </div>
               </div>
 
-              <!-- Pillar 4: Soluble Fiber -->
+              <!-- Pillar 4: Soluble Fibre -->
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
-                  4. Soluble Fiber
-                  <Tooltip>
+                  4. Soluble Fibre
+                  <Tooltip class="-m-1.5 p-1.5">
                     {#snippet children()}
-                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                      <i class="text-slate-400 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
-                      <p class="font-bold">Soluble Fiber</p>
+                      <p class="font-bold">Soluble Fibre</p>
                       <p class="font-normal text-xs">Form gels in the gut to slow sugar absorption and feed beneficial microbiome.</p>
                     {/snippet}
                   </Tooltip>
                 </div>
-                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.solubleFiberContent}g</div>
+                <div class="font-bold text-slate-800 text-xl">{analysis.healthMetrics.solubleFibreContent}g</div>
                 <div class="mt-1">
                   <span class="font-bold text-[9px] text-emerald-600 uppercase tracking-tight">Gut Health Factor</span>
                 </div>
@@ -433,9 +454,9 @@
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
                   5. Na : K Balance
-                  <Tooltip>
+                  <Tooltip class="-m-1.5 p-1.5">
                     {#snippet children()}
-                      <i class="text-slate-300 hover:text-emerald-500 fas fa-circle-info"></i>
+                      <i class="text-slate-400 hover:text-emerald-500 fas fa-circle-info"></i>
                     {/snippet}
                     {#snippet content()}
                       <p class="font-bold">Sodium to Potassium Ratio</p>
@@ -454,38 +475,85 @@
               </div>
             </div>
 
+            <!-- Visualization Section -->
+            <div class="gap-6 grid grid-cols-1 lg:grid-cols-2 mb-8">
+              <GlycaemicChart
+                gi={analysis.totalGI}
+                gl={analysis.healthMetrics.glycaemicLoad}
+                synergy={analysis.healthMetrics.macronutrientSynergy}
+              />
+              <MacroChart
+                protein={macroTotals.protein}
+                fat={macroTotals.fat}
+                fibre={macroTotals.fibre}
+                carbs={macroTotals.carbs}
+              />
+            </div>
+
             <div class="bg-indigo-50/50 mb-6 p-4 border border-indigo-100 rounded-2xl">
               <div class="flex items-center mb-2">
                 <div class="flex justify-center items-center bg-indigo-100 mr-2 rounded-lg w-6 h-6">
                   <i class="text-indigo-600 text-xs fas fa-microscope"></i>
                 </div>
                 <h3 class="font-bold text-indigo-900 text-sm">Clinical Pillar Assessment</h3>
-                {#if analysis.healthMetrics.ageRisk}
-                  <span class="ml-auto px-2 py-0.5 rounded-full font-bold text-[9px] uppercase {analysis.healthMetrics.ageRisk === 'low' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
-                    AGE Risk: {analysis.healthMetrics.ageRisk}
-                  </span>
+                {#if analysis?.healthMetrics.ageRisk}
+                  <Tooltip class="-m-1 p-1">
+                    {#snippet children()}
+                      <span class="ml-auto px-2 py-0.5 rounded-full font-bold text-[9px] uppercase cursor-help {analysis?.healthMetrics.ageRisk === 'low' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">
+                        AGE Risk: {analysis?.healthMetrics.ageRisk}
+                      </span>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Advanced Glycation End-products</p>
+                      <p class="font-normal text-xs">Inflammatory compounds that form when proteins/fats bond with sugar, especially during high-heat cooking.</p>
+                    {/snippet}
+                  </Tooltip>
                 {/if}
               </div>
               <p class="mb-4 text-indigo-800 text-xs leading-relaxed">
-                {analysis.healthMetrics.pillarExplanation}
+                {analysis?.healthMetrics.pillarExplanation}
               </p>
 
               <!-- Advanced Metrics Row -->
               <div class="gap-3 grid grid-cols-1 sm:grid-cols-3 pt-3 border-indigo-100/50 border-t">
                 <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
-                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Fiber : Carb</div>
-                  <div class="font-bold text-indigo-900 text-xs">{analysis.healthMetrics.fiberToCarbRatio}</div>
+                  <Tooltip class="-m-1 p-1">
+                    {#snippet children()}
+                      <div class="border-indigo-100 border-b border-dotted w-fit font-bold text-[9px] text-indigo-400 uppercase cursor-help">Fibre : Carb</div>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">The 5:1 Rule</p>
+                      <p class="font-normal text-xs">Aim for at least 1g of fibre for every 5g of carbs to minimize insulin spikes.</p>
+                    {/snippet}
+                  </Tooltip>
+                  <div class="font-bold text-indigo-900 text-xs">{analysis.healthMetrics.fibreToCarbRatio}</div>
                   <div class="text-[8px] text-slate-400">Target 1:5 or better</div>
                 </div>
                 <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
-                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Sat. Fat %</div>
+                  <Tooltip class="-m-1 p-1">
+                    {#snippet children()}
+                      <div class="border-indigo-100 border-b border-dotted w-fit font-bold text-[9px] text-indigo-400 uppercase cursor-help">Sat. Fat %</div>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Saturated Fat Calories</p>
+                      <p class="font-normal text-xs">The NHS recommends keeping saturated fat under 6% of total calories for heart health.</p>
+                    {/snippet}
+                  </Tooltip>
                   <div class="text-xs font-bold {analysis.healthMetrics.saturatedFatCaloriesPercent < 6 ? 'text-emerald-600' : 'text-amber-600'}">
                     {analysis.healthMetrics.saturatedFatCaloriesPercent.toFixed(1)}%
                   </div>
-                  <div class="text-[8px] text-slate-400">AHA Target &lt; 6%</div>
+                  <div class="text-[8px] text-slate-400">NHS Target &lt; 6%</div>
                 </div>
                 <div class="bg-white/60 p-2 border border-indigo-50 rounded-xl">
-                  <div class="font-bold text-[9px] text-indigo-400 uppercase">Heart Health</div>
+                  <Tooltip class="-m-1 p-1">
+                    {#snippet children()}
+                      <div class="border-indigo-100 border-b border-dotted w-fit font-bold text-[9px] text-indigo-400 uppercase cursor-help">Heart Health</div>
+                    {/snippet}
+                    {#snippet content()}
+                      <p class="font-bold">Heart Health Score</p>
+                      <p class="font-normal text-xs">Composite score based on lipid ratios, sodium balance, and fibre content. Goal is 80+.</p>
+                    {/snippet}
+                  </Tooltip>
                   <div class="font-bold text-indigo-900 text-xs">{analysis.healthMetrics.heartHealthScore}/100</div>
                   <div class="bg-indigo-100 mt-1 rounded-full w-full h-1 overflow-hidden">
                     <div class="bg-indigo-500 h-full" style="width: {analysis.healthMetrics.heartHealthScore}%"></div>
@@ -502,9 +570,39 @@
                   <thead class="bg-slate-50 border-slate-100 border-b">
                     <tr>
                       <th class="px-4 py-3 font-bold text-[10px] text-slate-500 uppercase">Ingredient</th>
-                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">P / F / FB</th>
-                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">GI</th>
-                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">GL</th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">
+                        <Tooltip class="-m-1 p-1">
+                          {#snippet children()}
+                            <span class="border-slate-300 border-b border-dotted cursor-help">P / F / FB</span>
+                          {/snippet}
+                          {#snippet content()}
+                            <p class="font-bold">Protein / Fat / Fibre</p>
+                            <p class="font-normal text-xs">Essential nutrients that slow down carbohydrate digestion and glucose absorption.</p>
+                          {/snippet}
+                        </Tooltip>
+                      </th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">
+                        <Tooltip class="-m-1 p-1">
+                          {#snippet children()}
+                            <span class="border-slate-300 border-b border-dotted cursor-help">GI</span>
+                          {/snippet}
+                          {#snippet content()}
+                            <p class="font-bold">Glycaemic Index (GI)</p>
+                            <p class="font-normal text-xs">Ranks how quickly foods raise blood sugar (0-100). Low: &le;55, Med: 56-69, High: 70+.</p>
+                          {/snippet}
+                        </Tooltip>
+                      </th>
+                      <th class="px-2 py-3 font-bold text-[10px] text-slate-500 text-center uppercase">
+                        <Tooltip class="-m-1 p-1">
+                          {#snippet children()}
+                            <span class="border-slate-300 border-b border-dotted cursor-help">GL</span>
+                          {/snippet}
+                          {#snippet content()}
+                            <p class="font-bold">Glycaemic Load (GL)</p>
+                            <p class="font-normal text-xs">Measures glycaemic impact based on serving size. Low: &le;10, Med: 11-19, High: 20+.</p>
+                          {/snippet}
+                        </Tooltip>
+                      </th>
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-slate-100">
@@ -514,12 +612,20 @@
                           <div class="font-bold text-slate-700 text-sm">{ing.name}</div>
                           <div class="flex flex-wrap gap-1 mt-1">
                             {#if ing.groundingSource && ing.groundingSource !== 'ESTIMATED'}
-                               <span class="bg-emerald-50 px-1 py-0.5 rounded font-bold text-[8px] text-emerald-600 uppercase tracking-tighter">
-                                 {ing.groundingSource} Match
-                               </span>
+                              <Tooltip class="-m-1 p-1">
+                                {#snippet children()}
+                                  <span class="bg-emerald-50 px-1 py-0.5 rounded font-bold text-[8px] text-emerald-600 uppercase tracking-tighter cursor-help">
+                                    {ing.groundingSource} Match
+                                  </span>
+                                {/snippet}
+                                {#snippet content()}
+                                  <p class="font-bold">Clinical Data Match</p>
+                                  <p class="font-normal text-xs">This ingredient was successfully matched against the {ing.groundingSource === 'USDA' ? 'USDA Foundation Food' : 'International GI'} database.</p>
+                                {/snippet}
+                              </Tooltip>
                             {/if}
                             {#if ing.smokePointWarning}
-                              <Tooltip>
+                              <Tooltip class="-m-1 p-1">
                                 {#snippet children()}
                                   <span class="bg-amber-100 px-1 py-0.5 rounded font-bold text-[8px] text-amber-600 uppercase tracking-tighter cursor-help">
                                     <i class="mr-0.5 fas fa-temperature-high"></i> Smoke Point
@@ -532,7 +638,7 @@
                               </Tooltip>
                             {/if}
                             {#if ing.hiddenSugarDetection}
-                              <Tooltip>
+                              <Tooltip class="-m-1 p-1">
                                 {#snippet children()}
                                   <span class="bg-rose-100 px-1 py-0.5 rounded font-bold text-[8px] text-rose-600 uppercase tracking-tighter cursor-help">
                                     <i class="mr-0.5 fas fa-cookie"></i> Hidden Sugar
@@ -548,9 +654,30 @@
                         </td>
                         <td class="px-2 py-3">
                           <div class="flex justify-center gap-1.5 opacity-80 grayscale-[0.5]">
-                            <span class="bg-blue-50 px-1 border border-blue-100 rounded text-[10px] text-blue-700" title="Protein">{ing.protein}g</span>
-                            <span class="bg-amber-50 px-1 border border-amber-100 rounded text-[10px] text-amber-700" title="Fat">{ing.fat}g</span>
-                            <span class="bg-emerald-50 px-1 border border-emerald-100 rounded text-[10px] text-emerald-700" title="Fiber">{ing.fiber}g</span>
+                            <Tooltip class="-m-1 p-1">
+                              {#snippet children()}
+                                <span class="bg-blue-50 px-1 border border-blue-100 rounded text-[10px] text-blue-700 cursor-help">{ing.protein}g</span>
+                              {/snippet}
+                              {#snippet content()}
+                                <span class="font-bold">Protein</span>
+                              {/snippet}
+                            </Tooltip>
+                            <Tooltip class="-m-1 p-1">
+                              {#snippet children()}
+                                <span class="bg-amber-50 px-1 border border-amber-100 rounded text-[10px] text-amber-700 cursor-help">{ing.fat}g</span>
+                              {/snippet}
+                              {#snippet content()}
+                                <span class="font-bold">Fat</span>
+                              {/snippet}
+                            </Tooltip>
+                            <Tooltip class="-m-1 p-1">
+                              {#snippet children()}
+                                <span class="bg-emerald-50 px-1 border border-emerald-100 rounded text-[10px] text-emerald-700 cursor-help">{ing.fibre}g</span>
+                              {/snippet}
+                              {#snippet content()}
+                                <span class="font-bold">Fibre</span>
+                              {/snippet}
+                            </Tooltip>
                           </div>
                         </td>
                         <td class="px-2 py-3 text-sm text-center font-bold {ing.gi > 70 ? 'text-rose-500' : ing.gi > 55 ? 'text-amber-500' : 'text-emerald-500'}">
@@ -605,7 +732,7 @@
           </div>
 
           <!-- Chat Section -->
-          <div class="slide-in-from-bottom-4 flex flex-col shadow-xl border border-white/50 rounded-3xl h-[450px] overflow-hidden animate-in duration-500 delay-200 glass fade-in">
+          <div class="slide-in-from-bottom-4 flex flex-col shadow-xl border border-white/50 rounded-3xl h-112.5 overflow-hidden animate-in duration-500 delay-200 glass fade-in">
             <div class="flex justify-between items-center bg-white/50 p-3.5 border-slate-100 border-b">
               <div class="flex items-center">
                 <div class="relative">
@@ -616,7 +743,7 @@
                 </div>
                 <div class="ml-3">
                   <div class="font-bold text-slate-800 text-xs">GlycoWise Expert</div>
-                  <div class="font-medium text-[9px] text-slate-400 uppercase tracking-wider">Clinical Nutritionist Online</div>
+                  <div class="font-medium text-[9px] text-slate-400 uppercase tracking-wider">Clinical Dietitian Online</div>
                 </div>
               </div>
             </div>
@@ -670,6 +797,7 @@
               <button
                 type="submit"
                 disabled={isChatting || !chatInput.trim()}
+                aria-label="Send message"
                 class="flex justify-center items-center bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 shadow-emerald-200 shadow-lg rounded-xl w-9 h-9 text-white transition-all"
               >
                 <i class="text-xs fas fa-paper-plane"></i>
@@ -682,7 +810,7 @@
               <i class="text-3xl fas fa-chart-line"></i>
             </div>
             <h3 class="mb-1.5 font-bold text-slate-800 text-lg">Ready for Analysis</h3>
-            <p class="max-w-sm text-slate-500 text-sm">Provide a recipe or food photo on the left to see its glycemic impact here.</p>
+            <p class="max-w-sm text-slate-500 text-sm">Provide a recipe or food photo on the left to see its glycaemic impact here.</p>
           </div>
         {:else if status === AnalysisStatus.LOADING}
            <div class="flex flex-col justify-center items-center p-10 h-full text-center">
@@ -694,7 +822,7 @@
               </div>
             </div>
             <h3 class="mb-1.5 font-bold text-slate-800 text-lg">Scanning Food Data</h3>
-            <p class="text-slate-400 text-sm animate-pulse">Our AI nutritionist is calculating GI values...</p>
+            <p class="text-slate-400 text-sm animate-pulse">Our AI dietitian is calculating GI values...</p>
           </div>
         {/if}
       </section>
@@ -707,7 +835,7 @@
 </div>
 
 {#if showApiKeyPrompt}
-  <div class="z-[100] fixed inset-0 flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4">
+  <div class="z-100 fixed inset-0 flex justify-center items-center bg-slate-900/60 backdrop-blur-sm p-4">
     <div class="bg-white shadow-2xl p-8 rounded-3xl w-full max-w-md animate-in duration-200 zoom-in-95">
       <div class="mb-6 text-center">
         <div class="flex justify-center items-center bg-emerald-100 mx-auto mb-4 rounded-2xl w-16 h-16">
@@ -715,7 +843,7 @@
         </div>
         <h2 class="font-bold text-slate-800 text-2xl">Gemini API Key</h2>
         <p class="mt-2 text-slate-500 text-sm">
-          To provide expert nutritionist analysis, GlycoWise uses Google Gemini 3 Flash (Preview). Your key is stored locally in your browser and never sent to our servers.
+          To provide expert dietitian analysis, GlycoWise uses Google Gemini 3 Flash (Preview). Your key is stored locally in your browser and never sent to our servers.
         </p>
       </div>
 
