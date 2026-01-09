@@ -52,11 +52,19 @@ export interface RecipeAnalysis {
   swaps: SwapSuggestion[];
   summary: string;
   healthMetrics: HealthMetrics;
+  usage?: {
+    totalTokens: number;
+    estimatedCost: number;
+  };
 }
 
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+  usage?: {
+    totalTokens: number;
+    estimatedCost: number;
+  };
 }
 
 export enum AnalysisStatus {

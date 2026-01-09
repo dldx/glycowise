@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type, type Chat } from "@google/genai";
 import type { RecipeAnalysis } from "./types";
 import { dbService } from "./dbService.svelte";
+import { usageService } from "./usageService.svelte";
 
 function getAI() {
   if (typeof localStorage === 'undefined') return new GoogleGenAI({ apiKey: '' });
@@ -130,7 +131,16 @@ export async function analyseRecipe(
     throw new Error("Empty response from AI");
   }
 
-  return JSON.parse(response.text) as RecipeAnalysis;
+  const analysis = JSON.parse(response.text) as RecipeAnalysis;
+
+  if (response.usageMetadata) {
+    analysis.usage = usageService.recordUsage(
+      response.usageMetadata.promptTokenCount || 0,
+      response.usageMetadata.candidatesTokenCount || 0
+    );
+  }
+
+  return analysis;
 }
 
 export function startRecipeChat(analysis: RecipeAnalysis): Chat {

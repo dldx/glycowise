@@ -4,11 +4,13 @@
   import { AnalysisStatus } from '$lib/types';
   import type { RecipeAnalysis, ChatMessage } from '$lib/types';
   import { dbService } from '$lib/dbService.svelte';
+  import { usageService } from '$lib/usageService.svelte';
   import type { Chat } from "@google/genai";
   import SvelteMarkdown from 'svelte-markdown';
   import Tooltip from '$lib/components/ui/tooltip.svelte';
   import GlycaemicChart from '$lib/components/charts/GlycaemicChart.svelte';
   import MacroChart from '$lib/components/charts/MacroChart.svelte';
+  import NutrientRadarChart from '$lib/components/charts/NutrientRadarChart.svelte';
 
   let recipeText = $state('');
   let image = $state<string | null>(null);
@@ -161,16 +163,27 @@
     isChatting = true;
 
     try {
-      const stream = await chatSession.sendMessageStream({ message: userMessage });
+      const result = await chatSession.sendMessageStream({ message: userMessage });
       let fullResponse = '';
 
       chatHistory = [...chatHistory, { role: 'model', text: '' }];
 
-      for await (const chunk of stream) {
+      for await (const chunk of result) {
         fullResponse += chunk.text;
         const newHistory = [...chatHistory];
         newHistory[newHistory.length - 1].text = fullResponse;
         chatHistory = newHistory;
+      }
+
+      // Record usage after stream ends
+      // In @google/genai, usageMetadata is often available on the result object after iteration
+      const usageMetadata = (result as any).usageMetadata;
+      if (usageMetadata) {
+        const usage = usageService.recordUsage(
+          usageMetadata.promptTokenCount || 0,
+          usageMetadata.candidatesTokenCount || 0
+        );
+        chatHistory[chatHistory.length - 1].usage = usage;
       }
     } catch (err) {
       console.error(err);
@@ -222,7 +235,13 @@
 
     <!-- Header -->
     <header class="relative mb-8 text-center">
-      <div class="top-0 right-0 absolute">
+      <div class="top-0 right-0 absolute flex items-center gap-2">
+        {#if usageService.totalCost > 0}
+          <div class="flex flex-col items-end mr-4">
+            <span class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Session Cost</span>
+            <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(4)}</span>
+          </div>
+        {/if}
         <button
           onclick={() => showApiKeyPrompt = true}
           class="flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-colors"
@@ -359,10 +378,18 @@
       <section class="space-y-6">
         {#if status === AnalysisStatus.SUCCESS && analysis}
           <div bind:this={resultsRef} class="slide-in-from-bottom-4 shadow-xl p-5 border border-white/50 rounded-3xl animate-in duration-500 glass fade-in">
-            <h2 class="flex items-center mb-5 font-bold text-slate-800 text-xl">
-              <span class="bg-emerald-500 mr-4 rounded-full w-2 h-7"></span>
-              Analysis for: {analysis.recipeName}
-            </h2>
+            <div class="flex justify-between items-start mb-5">
+              <h2 class="flex items-center font-bold text-slate-800 text-xl">
+                <span class="bg-emerald-500 mr-4 rounded-full w-2 h-7"></span>
+                Analysis for: {analysis.recipeName}
+              </h2>
+              {#if analysis.usage}
+                <div class="bg-slate-100/50 px-3 py-1 rounded-full text-[10px] text-slate-400">
+                  <i class="mr-1 fas fa-microchip"></i>
+                  ${analysis.usage.estimatedCost.toFixed(4)} ({analysis.usage.totalTokens} tokens)
+                </div>
+              {/if}
+            </div>
 
             <!-- Scientific Pillars Grid -->
             <div class="gap-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 mb-6">
@@ -476,7 +503,7 @@
             </div>
 
             <!-- Visualization Section -->
-            <div class="gap-6 grid grid-cols-1 lg:grid-cols-2 mb-8">
+            <div class="gap-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mb-8">
               <GlycaemicChart
                 gi={analysis.totalGI}
                 gl={analysis.healthMetrics.glycaemicLoad}
@@ -487,6 +514,13 @@
                 fat={macroTotals.fat}
                 fibre={macroTotals.fibre}
                 carbs={macroTotals.carbs}
+              />
+              <NutrientRadarChart
+                gl={analysis.healthMetrics.glycaemicLoad}
+                fiber={macroTotals.fibre}
+                protein={macroTotals.protein}
+                sodiumPotassiumRatio={analysis.healthMetrics.sodiumPotassiumRatio}
+                saturatedFatPercent={analysis.healthMetrics.saturatedFatCaloriesPercent}
               />
             </div>
 
@@ -760,12 +794,17 @@
               {/if}
 
               {#each chatHistory as msg}
-                <div class="flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
+                <div class="flex flex-col {msg.role === 'user' ? 'items-end' : 'items-start'}">
                   <div class="max-w-[85%] {msg.role === 'user' ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-none' : 'bg-white border border-slate-100 text-slate-700 rounded-2xl rounded-tl-none'} p-2.5 shadow-sm">
                     <div class="prose-invert text-xs prose prose-sm markdown-content">
                       <SvelteMarkdown source={msg.text} />
                     </div>
                   </div>
+                  {#if msg.usage}
+                    <span class="mt-1 px-1 text-[9px] text-slate-400">
+                      ${msg.usage.estimatedCost.toFixed(5)} ({msg.usage.totalTokens} tokens)
+                    </span>
+                  {/if}
                 </div>
               {/each}
 
