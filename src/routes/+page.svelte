@@ -265,24 +265,24 @@
 
     <!-- Header -->
     <header class="relative mb-8 text-center">
-        <div class="top-0 grid grid-cols-3 p-4 w-full">
+        <div class="top-0 flex flex-row p-2 md:p-4 w-full">
         <button
           onclick={() => showApiKeyPrompt = true}
-          class="flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-colors"
+          class="flex flex-col justify-center items-center p-2 text-slate-400 hover:text-emerald-500 transition-colors shrink"
         >
           <i class="text-xl fas fa-key"></i>
           <span class="mt-1 font-bold text-[10px] uppercase tracking-wider">API Key</span>
         </button>
-        <div class="flex justify-center items-center">
+        <div class="flex justify-center items-center w-full">
         <i class="mr-3 text-emerald-500 text-2xl fas fa-leaf"></i>
         <h1 class="bg-clip-text bg-linear-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-2xl">
           GlycoWise
         </h1>
         </div>
         {#if usageService.totalCost > 0}
-          <div class="flex flex-col items-end mr-4">
-            <span class="font-bold text-[10px] text-slate-400 uppercase">Session Cost</span>
+          <div class="flex flex-col justify-center items-center mr-4 shrink">
             <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(2)}</span>
+            <span class="font-bold text-[10px] text-slate-400 uppercase">Session Cost</span>
           </div>
         {/if}
       </div>
