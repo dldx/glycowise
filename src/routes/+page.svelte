@@ -218,6 +218,11 @@
     }
   };
 
+  const sendSuggestion = (text: string) => {
+    chatInput = text;
+    handleSendMessage();
+  };
+
   $effect(() => {
     if (chatHistory.length > 0 || isChatting) {
       chatEndRef?.scrollIntoView({ behavior: "smooth" });
@@ -260,13 +265,7 @@
 
     <!-- Header -->
     <header class="relative mb-8 text-center">
-      <div class="top-0 right-0 absolute flex items-center gap-2">
-        {#if usageService.totalCost > 0}
-          <div class="flex flex-col items-end mr-4">
-            <span class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Session Cost</span>
-            <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(4)}</span>
-          </div>
-        {/if}
+        <div class="top-0 left-0 absolute flex items-center gap-2">
         <button
           onclick={() => showApiKeyPrompt = true}
           class="flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-colors"
@@ -274,6 +273,14 @@
           <i class="text-xl fas fa-key"></i>
           <span class="mt-1 font-bold text-[10px] uppercase tracking-wider">API Key</span>
         </button>
+        </div>
+      <div class="top-0 right-0 absolute flex items-center gap-2">
+        {#if usageService.totalCost > 0}
+          <div class="flex flex-col items-end mr-4">
+            <span class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Session Cost</span>
+            <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(2)}</span>
+          </div>
+        {/if}
       </div>
       <div class="inline-flex justify-center items-center bg-white shadow-sm mb-3 p-2.5 rounded-2xl">
         <i class="mr-3 text-emerald-500 text-2xl fas fa-leaf"></i>
@@ -832,7 +839,7 @@
           </div>
 
           <!-- Chat Section -->
-          <div class="slide-in-from-bottom-4 flex flex-col shadow-xl border border-white/50 rounded-3xl h-112.5 overflow-hidden animate-in duration-500 delay-200 glass fade-in">
+          <div class="slide-in-from-bottom-4 flex flex-col shadow-xl border border-white/50 rounded-3xl animate-in duration-500 delay-200 glass fade-in">
             <div class="flex justify-between items-center bg-white/50 p-3.5 border-slate-100 border-b">
               <div class="flex items-center">
                 <div class="relative">
@@ -848,14 +855,36 @@
               </div>
             </div>
 
-            <div class="flex-1 space-y-4 bg-slate-50/30 p-4 overflow-y-auto">
+            <div class="flex-1 space-y-4 bg-slate-50/30 p-4">
               {#if chatHistory.length === 0}
                 <div class="px-8 py-10 text-center">
                   <div class="flex justify-center items-center bg-white shadow-sm mx-auto mb-3 rounded-2xl w-14 h-14 text-emerald-400">
                     <i class="text-xl fas fa-comments"></i>
                   </div>
                   <h4 class="mb-1 font-bold text-slate-800 text-sm">Ask a Follow-up</h4>
-                  <p class="text-slate-500 text-xs">"How can I lower the GL of this dish?" or "Is this safe for gestational diabetes?"</p>
+                  <p class="mb-5 text-slate-500 text-xs">Choose a topic or type your own question below.</p>
+
+                  <div class="flex flex-wrap justify-center gap-2 mx-auto max-w-lg">
+                    <button
+                      onclick={() => sendSuggestion("How can I lower the GL of this dish?")}
+                      class="bg-white hover:bg-emerald-50 px-4 py-2 border border-slate-100 hover:border-emerald-200 rounded-xl font-semibold text-slate-600 text-xs transition-all"
+                    >
+                      "How can I lower the GL of this dish?"
+                    </button>
+                    <button
+                      onclick={() => sendSuggestion("Is this safe for gestational diabetes?")}
+                      class="bg-white hover:bg-emerald-50 px-4 py-2 border border-slate-100 hover:border-emerald-200 rounded-xl font-semibold text-slate-600 text-xs transition-all"
+                    >
+                      "Is this safe for gestational diabetes?"
+                    </button>
+                    <button
+                      onclick={() => sendSuggestion("Generate a full recipe based on your recommendations")}
+                      class="bg-white hover:bg-emerald-50 shadow-sm px-4 py-2 border border-emerald-100 hover:border-emerald-300 rounded-xl font-bold text-emerald-600 text-xs transition-all"
+                    >
+                      <i class="mr-1 fas fa-wand-magic-sparkles"></i>
+                      Generate recipe from recommendations
+                    </button>
+                  </div>
                 </div>
               {/if}
 
