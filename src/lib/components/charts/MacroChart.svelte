@@ -20,12 +20,27 @@
 
 </script>
 
-<div class="flex flex-col bg-white shadow-sm p-4 border border-slate-100 rounded-2xl w-full h-64 overflow-hidden">
-  <h4 class="mb-4 font-bold text-[10px] text-slate-400 uppercase tracking-widest">Macro Distribution (%)</h4>
+<div class="flex flex-col bg-white shadow-sm p-4 border border-slate-100 rounded-2xl w-full h-full overflow-hidden">
+  <div class="flex justify-between items-center mb-4">
+    <div class="flex items-center gap-2">
+      <h4 class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Macro Distribution (%)</h4>
+      <Tooltip>
+        {#snippet children()}
+          <i class="text-slate-300 text-xs cursor-help fas fa-circle-info"></i>
+        {/snippet}
+        {#snippet content()}
+          <div class="max-w-xs text-[10px]">
+            <p class="mb-1 font-bold">Macronutrient Balance:</p>
+            <p>Shows the weight-based distribution of main nutrients. For glycaemic health, a significant presence of protein, fat, and especially fibre is desired to slow the absorption of carbohydrates (the 'blunting' effect).</p>
+          </div>
+        {/snippet}
+      </Tooltip>
+    </div>
+  </div>
 
-  <div class="flex flex-1 items-stretch gap-8 pt-2 min-h-0">
+  <div class="flex flex-1 justify-center items-center gap-6 pt-2 min-h-0">
     <!-- Vertical Stacked Bar -->
-    <div class="flex flex-col-reverse bg-slate-50 border border-slate-100 rounded-xl w-12 overflow-hidden shrink-0">
+    <div class="flex flex-col-reverse bg-slate-50 border border-slate-100 rounded-xl w-14 h-40 overflow-hidden shrink-0">
       {#each data as item}
         {#if item.value > 0}
           <Tooltip style="height: {item.value}%; width: 100%; display: block;">
@@ -47,15 +62,15 @@
     </div>
 
     <!-- Labels -->
-    <div class="flex flex-col flex-1 justify-around">
+    <div class="flex flex-col justify-center gap-3">
       {#each [...data].reverse() as item}
         <Tooltip class="-m-1 p-1">
           {#snippet children()}
-            <div class="group flex items-center gap-3 cursor-help">
-              <div class="rounded-full w-2.5 h-2.5 group-hover:scale-125 transition-transform shrink-0" style="background-color: {item.color}"></div>
+            <div class="group flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors cursor-help">
+              <div class="shadow-sm rounded-full w-3 h-3 group-hover:scale-110 transition-transform shrink-0" style="background-color: {item.color}"></div>
               <div class="flex flex-col">
-                <span class="font-bold text-[11px] text-slate-700 leading-tight">{item.label}</span>
-                <span class="font-medium text-[10px] text-slate-400 leading-tight">{item.value.toFixed(1)}%</span>
+                <span class="mb-1 font-bold text-slate-700 text-xs leading-none">{item.label}</span>
+                <span class="font-medium text-[10px] text-slate-400 leading-none">{item.value.toFixed(1)}%</span>
               </div>
             </div>
           {/snippet}

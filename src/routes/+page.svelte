@@ -265,7 +265,7 @@
 
     <!-- Header -->
     <header class="relative mb-8 text-center">
-        <div class="top-0 left-0 absolute flex items-center gap-2">
+        <div class="top-0 grid grid-cols-3 p-4 w-full">
         <button
           onclick={() => showApiKeyPrompt = true}
           class="flex flex-col items-center p-2 text-slate-400 hover:text-emerald-500 transition-colors"
@@ -273,20 +273,18 @@
           <i class="text-xl fas fa-key"></i>
           <span class="mt-1 font-bold text-[10px] uppercase tracking-wider">API Key</span>
         </button>
-        </div>
-      <div class="top-0 right-0 absolute flex items-center gap-2">
-        {#if usageService.totalCost > 0}
-          <div class="flex flex-col items-end mr-4">
-            <span class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Session Cost</span>
-            <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(2)}</span>
-          </div>
-        {/if}
-      </div>
-      <div class="inline-flex justify-center items-center bg-white shadow-sm mb-3 p-2.5 rounded-2xl">
+        <div class="flex justify-center items-center">
         <i class="mr-3 text-emerald-500 text-2xl fas fa-leaf"></i>
         <h1 class="bg-clip-text bg-linear-to-r from-emerald-600 to-sky-600 font-bold text-transparent text-2xl">
           GlycoWise
         </h1>
+        </div>
+        {#if usageService.totalCost > 0}
+          <div class="flex flex-col items-end mr-4">
+            <span class="font-bold text-[10px] text-slate-400 uppercase">Session Cost</span>
+            <span class="font-mono font-bold text-emerald-600 text-sm">${usageService.totalCost.toFixed(2)}</span>
+          </div>
+        {/if}
       </div>
       <p class="text-slate-600 text-base">Intelligent Glycaemic Index & Load Analysis</p>
       <p class="mt-1 font-medium text-emerald-600 text-xs uppercase tracking-widest">Powered by Gemini 3 Flash (Preview)</p>
@@ -465,7 +463,7 @@
             </div>
 
             <!-- Scientific Pillars Grid -->
-            <div class="gap-3 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 mb-6">
+            <div class="gap-3 grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 mb-6">
               <!-- Pillar 1: GL -->
               <div class="bg-white shadow-sm p-3 border border-slate-100 rounded-2xl">
                 <div class="flex justify-between items-center mb-1 font-bold text-[10px] text-slate-400 uppercase tracking-wider">
@@ -576,12 +574,7 @@
             </div>
 
             <!-- Visualization Section -->
-            <div class="gap-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 mb-8">
-              <GlycaemicChart
-                gi={analysis.totalGI}
-                gl={analysis.healthMetrics.glycaemicLoad}
-                synergy={analysis.healthMetrics.macronutrientSynergy}
-              />
+            <div class="items-stretch gap-6 grid grid-cols-1 md:grid-cols-2 mb-8">
               <MacroChart
                 protein={macroTotals.protein}
                 fat={macroTotals.fat}
@@ -595,6 +588,13 @@
                 sodiumPotassiumRatio={analysis.healthMetrics.sodiumPotassiumRatio}
                 saturatedFatPercent={analysis.healthMetrics.saturatedFatCaloriesPercent}
               />
+              <div class="md:col-span-2">
+              <GlycaemicChart
+                gi={analysis.totalGI}
+                gl={analysis.healthMetrics.glycaemicLoad}
+                synergy={analysis.healthMetrics.macronutrientSynergy}
+              />
+              </div>
             </div>
 
             <div class="bg-indigo-50/50 mb-6 p-4 border border-indigo-100 rounded-2xl">

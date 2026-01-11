@@ -1,6 +1,7 @@
 <script lang="ts">
   import { scaleLinear } from 'd3-scale';
   import { line, curveBasis } from 'd3-shape';
+  import Tooltip from '../ui/tooltip.svelte';
 
   interface Props {
     gi: number;
@@ -24,7 +25,7 @@
   };
 
   const dataPoints = $derived(generateCurve());
-  const width = 300;
+  const width = 450;
   const height = 150;
   const margin = { top: 10, right: 10, bottom: 40, left: 30 };
 
@@ -46,7 +47,20 @@
 
 <div class="flex flex-col bg-white shadow-sm p-4 border border-slate-100 rounded-2xl w-full h-64 overflow-hidden">
   <div class="flex justify-between items-center mb-4">
-    <h4 class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Blood Glucose Response</h4>
+    <div class="flex items-center gap-2">
+      <h4 class="font-bold text-[10px] text-slate-400 uppercase tracking-widest">Blood Glucose Response</h4>
+      <Tooltip>
+        {#snippet children()}
+          <i class="text-slate-300 text-xs cursor-help fas fa-circle-info"></i>
+        {/snippet}
+        {#snippet content()}
+          <div class="max-w-xs text-[10px]">
+            <p class="mb-1 font-bold">Predicted Glucose Curve:</p>
+            <p>Estimates the post-prandial blood glucose response over 180 minutes. A flatter, smoother curve (high synergy) indicates better glycaemic control compared to a sharp spike.</p>
+          </div>
+        {/snippet}
+      </Tooltip>
+    </div>
     <div class="flex items-center gap-1">
       <div class="bg-emerald-500 rounded-full w-2 h-2"></div>
       <span class="text-[9px] text-slate-500">Predicted Curve</span>
@@ -54,7 +68,7 @@
   </div>
 
   <div class="relative flex-1 min-h-0">
-    <svg viewBox="0 0 {width} {height}" class="w-full h-full preserve-3d" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="0 0 {width} {height}" class="w-full h-full preserve-3d" preserveAspectRatio="none">
       <!-- Grid lines -->
       {#each [80, 120, 160] as y}
         <line
