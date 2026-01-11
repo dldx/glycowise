@@ -5,6 +5,7 @@
   import type { RecipeAnalysis, ChatMessage } from '$lib/types';
   import { dbService } from '$lib/dbService.svelte';
   import { usageService } from '$lib/usageService.svelte';
+  import { historyService } from '$lib/historyService.svelte';
   import type { Chat } from "@google/genai";
   import SvelteMarkdown from 'svelte-markdown';
   import Tooltip from '$lib/components/ui/tooltip.svelte';
@@ -141,8 +142,22 @@
     analysis = null;
 
     try {
+      // Check Cache
+      const cached = await historyService.getCachedAnalysis(recipeText, image);
+      if (cached) {
+        analysis = cached;
+        const session = startRecipeChat(cached);
+        chatSession = session;
+        status = AnalysisStatus.SUCCESS;
+        return;
+      }
+
       const result = await analyseRecipe(recipeText || "Analyse this dish", image || undefined);
       analysis = result;
+
+      // Save to History
+      await historyService.saveEntry(recipeText, image, result);
+
       const session = startRecipeChat(result);
       chatSession = session;
       status = AnalysisStatus.SUCCESS;
@@ -151,6 +166,16 @@
       error = "Failed to analyse the recipe. Please try again.";
       status = AnalysisStatus.ERROR;
     }
+  };
+
+  const loadFromHistory = (entry: any) => {
+    recipeText = entry.input.text;
+    image = entry.input.image;
+    analysis = entry.analysis;
+    const session = startRecipeChat(entry.analysis);
+    chatSession = session;
+    chatHistory = [];
+    status = AnalysisStatus.SUCCESS;
   };
 
   const handleSendMessage = async (e?: Event) => {
@@ -372,6 +397,47 @@
             </div>
           {/if}
         </div>
+
+        <!-- History Section -->
+        {#if historyService.entries.length > 0}
+          <div class="mt-8 pt-6 border-slate-100 border-t">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-bold text-slate-700 text-sm uppercase tracking-wider">Recent Analysis History</h3>
+              <button
+                onclick={() => historyService.clearHistory()}
+                class="font-bold text-[10px] text-slate-400 hover:text-rose-500 uppercase transition-colors"
+              >
+                Clear All
+              </button>
+            </div>
+            <div class="space-y-2 pr-2 max-h-60 overflow-y-auto custom-scrollbar">
+              {#each historyService.entries as entry}
+                <button
+                  onclick={() => loadFromHistory(entry)}
+                  class="group flex items-center bg-white/40 hover:bg-emerald-50 p-3 border border-slate-100 rounded-xl w-full text-left transition-all"
+                >
+                  <div class="flex justify-center items-center bg-emerald-100 mr-3 rounded-lg w-8 h-8 shrink-0">
+                    {#if entry.input.image}
+                      <img src={entry.input.image} alt="" class="rounded-lg w-full h-full object-cover" />
+                    {:else}
+                      <i class="text-emerald-500 text-xs fas fa-history"></i>
+                    {/if}
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="flex justify-between items-center">
+                      <p class="font-bold text-slate-700 text-xs truncate">{entry.recipeName}</p>
+                      <span class="ml-2 text-[9px] text-slate-400 shrink-0">
+                        {new Date(entry.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 truncate">{entry.input.text || 'Photo Analysis'}</p>
+                  </div>
+                  <i class="fa-chevron-right opacity-0 group-hover:opacity-100 ml-2 text-emerald-400 text-xs transition-all fas"></i>
+                </button>
+              {/each}
+            </div>
+          </div>
+        {/if}
       </section>
 
       <!-- Results Section -->
@@ -934,5 +1000,15 @@
 
   .glass {
     @apply bg-white/70 backdrop-blur-md;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full;
   }
 </style>
